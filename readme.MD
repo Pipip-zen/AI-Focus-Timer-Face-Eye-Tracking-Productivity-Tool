@@ -42,7 +42,7 @@ The timer only runs when you are truly focused, helping you build better concent
 
 ### 📱 Mobile Web Version
 
-![App Preview](assets/mobile-preview.jpeg){ width=300 }
+![App Preview](assets/mobile-preview.jpeg)
 
 ---
 
