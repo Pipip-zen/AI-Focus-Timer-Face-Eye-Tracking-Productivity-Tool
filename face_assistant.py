@@ -5,7 +5,15 @@ import time
 from math import hypot
 from collections import deque 
 
-# --- 1. SETUP ---
+# --- 1. SETUP & INPUT DURASI ---
+print("=== SETUP FOKUS TIMER ===")
+try:
+    user_input = input("Masukkan durasi sesi fokus (menit): ")
+    POMODORO_MINUTES = float(user_input)
+except ValueError:
+    print("Input tidak valid, menggunakan default 25 menit.")
+    POMODORO_MINUTES = 25
+
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
     min_detection_confidence=0.5, 
@@ -18,10 +26,10 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 # --- CONFIG TIMER ---
-POMODORO_MINUTES = 25
 time_left = POMODORO_MINUTES * 60
 last_frame_time = time.time()
 timer_running = False
+is_paused_manual = True  # Default True agar pengguna bersiap dulu
 
 # --- VARIABEL KALIBRASI ---
 normal_pitch = 0
@@ -29,15 +37,12 @@ normal_yaw = 0
 is_calibrated = False
 
 # --- CONFIG SENSITIVITAS GERAKAN KEPALA ---
-THRESHOLD_PITCH_DOWN = 1.5   # Saya naikkan dikit ke 8 biar ga terlalu sensitif saat nunduk dikit
+THRESHOLD_PITCH_DOWN = 10   # Disesuaikan agar tidak terlalu sensitif
 THRESHOLD_PITCH_UP = 20    
 THRESHOLD_YAW = 15         
 
 # --- CONFIG MENGANTUK (EAR) ---
-# UPDATE: Diturunkan drastis sesuai request agar tidak false alarm saat menunduk
-EAR_THRESHOLD = 0.15       # Batas baru (Mata harus benar-benar merem)
-SLEEP_FRAMES_LIMIT = 40    # Buffer waktu sebelum alarm bunyi
-
+EAR_THRESHOLD = 0.15       
 ear_history = deque(maxlen=10) 
 
 # Font & Warna
@@ -48,6 +53,7 @@ COLOR_BLUE = (255, 0, 0)
 COLOR_YELLOW = (0, 255, 255)  
 COLOR_WHITE = (255, 255, 255)
 COLOR_PURPLE = (255, 0, 255)
+COLOR_ORANGE = (0, 165, 255) # Warna baru untuk PAUSE
 
 # --- FUNGSI EAR ---
 def calculate_ear(landmarks, indices, img_w, img_h):
@@ -64,7 +70,8 @@ def calculate_ear(landmarks, indices, img_w, img_h):
     ear = (v1 + v2) / (2.0 * h)
     return ear
 
-print("Sistem Berjalan. Threshold EAR: 0.15")
+print(f"Sistem Berjalan untuk {POMODORO_MINUTES} menit.")
+print("Tekan 's' untuk START, 'p' untuk PAUSE.")
 
 while cap.isOpened():
     current_time = time.time()
@@ -86,14 +93,16 @@ while cap.isOpened():
     is_focused_now = False
     
     rel_pitch = 0
+    rel_yaw = 0
     smooth_ear = 0.3 
 
+    # --- LOGIKA UTAMA ---
     if results.multi_face_landmarks:
         for face_landmarks in results.multi_face_landmarks:
             face_3d = []
             face_2d = []
             
-            # --- 1. HEAD POSE ---
+            # 1. HEAD POSE
             key_indices = [33, 263, 1, 61, 291, 199]
             for idx in key_indices:
                 lm = face_landmarks.landmark[idx]
@@ -118,17 +127,17 @@ while cap.isOpened():
             raw_pitch = angles[0] * 360
             raw_yaw = angles[1] * 360
 
-            # --- LOGIKA KALIBRASI ---
+            # KALIBRASI
             if not is_calibrated:
                 normal_pitch = raw_pitch
                 normal_yaw = raw_yaw
                 is_calibrated = True
-                print(f"Kalibrasi Selesai. Normal Pitch: {normal_pitch:.2f}")
+                print(f"Kalibrasi Selesai.")
 
             rel_pitch = raw_pitch - normal_pitch
             rel_yaw = raw_yaw - normal_yaw
             
-            # --- 2. DETEKSI MATA ---
+            # 2. DETEKSI MATA (EAR)
             left_indices = [33, 133, 160, 144, 158, 153]
             right_indices = [362, 263, 385, 380, 387, 373]
             
@@ -139,11 +148,14 @@ while cap.isOpened():
             ear_history.append(current_ear)
             smooth_ear = sum(ear_history) / len(ear_history)
 
-            # --- 3. LOGIKA GABUNGAN (FIXED) ---
-            
+            # 3. PENENTUAN STATUS
             is_sleeping = smooth_ear < EAR_THRESHOLD
             
-            if is_sleeping:
+            if is_paused_manual:
+                status_text = "PAUSED (MANUAL)"
+                status_color = COLOR_ORANGE
+                is_focused_now = False # Timer berhenti saat pause manual
+            elif is_sleeping:
                 status_text = "ALARM: TIDUR!"
                 status_color = COLOR_PURPLE
                 is_focused_now = False
@@ -156,7 +168,7 @@ while cap.isOpened():
                 status_color = COLOR_RED
                 is_focused_now = False
             elif rel_pitch < -THRESHOLD_PITCH_DOWN:
-                status_text = "MENUNDUK (MAIN HP?)"
+                status_text = "MENUNDUK"
                 status_color = COLOR_RED
                 is_focused_now = False
             elif rel_pitch > THRESHOLD_PITCH_UP:
@@ -168,14 +180,15 @@ while cap.isOpened():
                 status_color = COLOR_GREEN
                 is_focused_now = True
 
-            # Visualisasi Garis
+            # VISUALISASI HIDUNG
             nose_end_point2D, _ = cv2.projectPoints(np.array([(0.0, 0.0, 800.0)]), rot_vec, trans_vec, cam_matrix, dist_matrix)
             p1 = (int(nose_2d[0]), int(nose_2d[1]))
             p2 = (int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
             cv2.line(image, p1, p2, COLOR_BLUE, 3)
 
     # --- UPDATE TIMER ---
-    if is_focused_now and time_left > 0:
+    # Timer hanya jalan jika: FOKUS + TIDAK PAUSE MANUAL + WAKTU TERSISA
+    if is_focused_now and not is_paused_manual and time_left > 0:
         time_left -= delta_time
         timer_running = True
     else:
@@ -185,34 +198,49 @@ while cap.isOpened():
         time_left = 0
         status_text = "SELESAI!"
         status_color = COLOR_YELLOW
+        # Reset otomatis pause agar tidak kebablasan
+        is_paused_manual = True 
 
     # --- UI RENDER ---
-    cv2.rectangle(image, (0, 0), (img_w, 130), (0, 0, 0), -1)
-    cv2.addWeighted(image, 0.7, image, 0.3, 0, image[0:130, 0:img_w])
+    cv2.rectangle(image, (0, 0), (img_w, 140), (0, 0, 0), -1)
+    cv2.addWeighted(image, 0.7, image, 0.3, 0, image[0:140, 0:img_w])
 
     minutes = int(time_left // 60)
     seconds = int(time_left % 60)
     timer_text = f"{minutes:02d}:{seconds:02d}"
-    timer_col = COLOR_GREEN if is_focused_now else COLOR_PURPLE if is_sleeping else COLOR_RED
+    
+    # Warna timer mengikuti status
+    if is_paused_manual:
+        timer_col = COLOR_ORANGE
+    elif is_focused_now:
+        timer_col = COLOR_GREEN
+    else:
+        timer_col = COLOR_RED
     
     cv2.putText(image, "TIME LEFT", (img_w - 280, 40), FONT, 0.8, COLOR_WHITE, 1)
     cv2.putText(image, timer_text, (img_w - 280, 100), FONT, 2.5, timer_col, 4)
 
-    cv2.putText(image, status_text, (30, 90), FONT, 1.5, status_color, 3)
+    cv2.putText(image, status_text, (30, 90), FONT, 1.2, status_color, 3)
     
-    # Info Debug - Cek nilai Mata di sini
-    debug_text = f"Pitch: {int(rel_pitch)} | Mata: {smooth_ear:.2f} (Batas: <{EAR_THRESHOLD})"
-    cv2.putText(image, debug_text, (30, 30), FONT, 0.65, COLOR_YELLOW, 2)
+    # Debug Info
+    debug_text = f"P:{int(rel_pitch)} | Y:{int(rel_yaw)} | EAR:{smooth_ear:.2f}"
+    cv2.putText(image, debug_text, (30, 30), FONT, 0.6, COLOR_YELLOW, 1)
     
-    cv2.putText(image, "'c': Kalibrasi | 'q': Keluar", (30, 120), FONT, 0.5, COLOR_WHITE, 1)
+    # Instruksi Kontrol
+    control_text = "'s': START | 'p': PAUSE | 'c': RE-CALIBRATE | 'q': QUIT"
+    cv2.putText(image, control_text, (30, 130), FONT, 0.6, COLOR_WHITE, 1)
 
-    cv2.imshow('AI Focus - Fixed Threshold', image)
+    cv2.imshow('AI Focus Timer V2', image)
     
     key = cv2.waitKey(5) & 0xFF
     if key == ord('q'): 
         break
     elif key == ord('c'):
         is_calibrated = False
+    elif key == ord('p'):
+        is_paused_manual = True
+    elif key == ord('s'):
+        is_paused_manual = False
 
 cap.release()
 cv2.destroyAllWindows()
