@@ -27,36 +27,26 @@ cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-# --- FUNGSI AUDIO ASYNC (Agar video tidak patah-patah) ---
+# --- FUNGSI AUDIO ASYNC ---
 def play_sound(sound_type):
-    """
-    Menjalankan suara di thread terpisah.
-    Tipe: 'start', 'pause', 'resume', 'alarm', 'warning'
-    """
     def run_sound():
         try:
             if sound_type == 'start':
-                # Nada naik (Tanda mulai)
                 winsound.Beep(500, 150)
                 winsound.Beep(1000, 300)
             elif sound_type == 'pause':
-                # Nada turun (Tanda istirahat)
                 winsound.Beep(700, 200)
                 winsound.Beep(400, 200)
             elif sound_type == 'resume':
-                # Nada naik pendek
                 winsound.Beep(500, 150)
                 winsound.Beep(800, 150)
             elif sound_type == 'alarm':
-                # Alarm Nyaring (Tidur)
                 winsound.Beep(2000, 300) 
             elif sound_type == 'warning':
-                # Peringatan Rendah (Menunduk)
                 winsound.Beep(600, 150)
-        except Exception as e:
-            pass # Abaikan error jika sistem sound bermasalah
+        except Exception:
+            pass 
 
-    # Jalankan di thread baru
     threading.Thread(target=run_sound, daemon=True).start()
 
 # --- CONFIG TIMER ---
@@ -70,19 +60,18 @@ normal_pitch = 0
 normal_yaw = 0
 is_calibrated = False
 
-# --- CONFIG SENSITIVITAS GERAKAN KEPALA ---
-THRESHOLD_PITCH_DOWN = 2
+# --- CONFIG SENSITIVITAS ---
+THRESHOLD_PITCH_DOWN = 4
 THRESHOLD_PITCH_UP = 20    
 THRESHOLD_YAW = 15         
 
-# --- CONFIG MENGANTUK (EAR) ---
+# --- CONFIG EAR (MATA) ---
 EAR_THRESHOLD = 0.15       
 ear_history = deque(maxlen=10) 
 
-# --- CONFIG INTERVAL SUARA ---
-# Agar alarm tidak bunyi berisik setiap mili-detik (spam)
+# --- CONFIG SUARA ---
 last_alarm_time = 0
-ALARM_COOLDOWN = 1.5 # Alarm hanya bunyi max setiap 1.5 detik
+ALARM_COOLDOWN = 1.5 
 
 # Font & Warna
 FONT = cv2.FONT_HERSHEY_SIMPLEX
@@ -110,8 +99,7 @@ def calculate_ear(landmarks, indices, img_w, img_h):
     return ear
 
 print(f"Sesi DIMULAI untuk {POMODORO_MINUTES} menit.")
-print("Sound System Aktif.")
-play_sound('start') # Bunyi awal
+play_sound('start') 
 
 while cap.isOpened():
     current_time = time.time()
@@ -149,7 +137,7 @@ while cap.isOpened():
                 x, y = int(lm.x * img_w), int(lm.y * img_h)
                 face_2d.append([x, y])
                 face_3d.append([x, y, lm.z])
-                if idx == 1: nose_2d = (x, y)
+                # Hapus pengambilan nose_2d karena garis biru dihapus
 
             face_2d = np.array(face_2d, dtype=np.float64)
             face_3d = np.array(face_3d, dtype=np.float64)
@@ -160,6 +148,7 @@ while cap.isOpened():
                                    [0, 0, 1]])
             dist_matrix = np.zeros((4, 1), dtype=np.float64)
 
+            # Hitung rotasi untuk logika menunduk/menoleh (Tetap diperlukan logic-nya)
             success, rot_vec, trans_vec = cv2.solvePnP(face_3d, face_2d, cam_matrix, dist_matrix)
             rmat, jac = cv2.Rodrigues(rot_vec)
             angles, _, _, _, _, _ = cv2.RQDecomp3x3(rmat)
@@ -187,10 +176,9 @@ while cap.isOpened():
             ear_history.append(current_ear)
             smooth_ear = sum(ear_history) / len(ear_history)
 
-            # 3. PENENTUAN STATUS & LOGIKA SUARA
+            # 3. PENENTUAN STATUS
             is_sleeping = smooth_ear < EAR_THRESHOLD
             
-            # Cek apakah sudah waktunya membunyikan alarm (Cooldown system)
             time_since_alarm = current_time - last_alarm_time
             should_play_alarm = time_since_alarm > ALARM_COOLDOWN
 
@@ -203,7 +191,7 @@ while cap.isOpened():
                 status_color = COLOR_PURPLE
                 is_focused_now = False
                 if should_play_alarm:
-                    play_sound('alarm') # Bunyi Keras
+                    play_sound('alarm')
                     last_alarm_time = current_time
             elif rel_yaw < -THRESHOLD_YAW:
                 status_text = "MENOLEH KIRI"
@@ -218,7 +206,7 @@ while cap.isOpened():
                 status_color = COLOR_RED
                 is_focused_now = False
                 if should_play_alarm:
-                    play_sound('warning') # Bunyi Peringatan
+                    play_sound('warning')
                     last_alarm_time = current_time
             elif rel_pitch > THRESHOLD_PITCH_UP:
                 status_text = "MENDONGAK"
@@ -228,12 +216,8 @@ while cap.isOpened():
                 status_text = "FOKUS"
                 status_color = COLOR_GREEN
                 is_focused_now = True
-
-            # VISUALISASI HIDUNG
-            nose_end_point2D, _ = cv2.projectPoints(np.array([(0.0, 0.0, 800.0)]), rot_vec, trans_vec, cam_matrix, dist_matrix)
-            p1 = (int(nose_2d[0]), int(nose_2d[1]))
-            p2 = (int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
-            cv2.line(image, p1, p2, COLOR_BLUE, 3)
+            
+            # [BAGIAN GAMBAR GARIS HIDUNG SUDAH DIHAPUS DI SINI]
 
     # --- UPDATE TIMER ---
     if is_focused_now and not is_paused_manual and time_left > 0:
@@ -246,12 +230,11 @@ while cap.isOpened():
         time_left = 0
         status_text = "SELESAI!"
         status_color = COLOR_YELLOW
-        # Bunyi 'Pause' jika timer selesai agar user sadar
         if not is_paused_manual:
             play_sound('pause')
         is_paused_manual = True 
 
-    # --- UI RENDER ---
+    # --- UI RENDER (CLEAN VERSION) ---
     cv2.rectangle(image, (0, 0), (img_w, 140), (0, 0, 0), -1)
     cv2.addWeighted(image, 0.7, image, 0.3, 0, image[0:140, 0:img_w])
 
@@ -266,18 +249,18 @@ while cap.isOpened():
     else:
         timer_col = COLOR_RED
     
+    # Timer Display
     cv2.putText(image, "TIME LEFT", (img_w - 280, 40), FONT, 0.8, COLOR_WHITE, 1)
     cv2.putText(image, timer_text, (img_w - 280, 100), FONT, 2.5, timer_col, 4)
 
-    cv2.putText(image, status_text, (30, 90), FONT, 1.2, status_color, 3)
+    # Status Display (Tanpa Debug Angka)
+    cv2.putText(image, status_text, (30, 80), FONT, 1.5, status_color, 3)
     
-    debug_text = f"P:{int(rel_pitch)} | Y:{int(rel_yaw)} | EAR:{smooth_ear:.2f}"
-    cv2.putText(image, debug_text, (30, 30), FONT, 0.6, COLOR_YELLOW, 1)
-    
+    # Controls Help
     control_text = "'p': PAUSE | 's': RESUME | 'c': RE-CALIBRATE | 'q': QUIT"
-    cv2.putText(image, control_text, (30, 130), FONT, 0.6, COLOR_WHITE, 1)
+    cv2.putText(image, control_text, (30, 120), FONT, 0.6, COLOR_WHITE, 1)
 
-    cv2.imshow('AI Focus Timer V3.0 (Sound FX)', image)
+    cv2.imshow('AI Focus Timer (Minimalist UI)', image)
     
     key = cv2.waitKey(5) & 0xFF
     if key == ord('q'): 
@@ -285,11 +268,11 @@ while cap.isOpened():
     elif key == ord('c'):
         is_calibrated = False
     elif key == ord('p'):
-        if not is_paused_manual: # Hanya bunyi jika belum pause
+        if not is_paused_manual: 
             play_sound('pause')
         is_paused_manual = True
     elif key == ord('s'):
-        if is_paused_manual: # Hanya bunyi jika sedang pause
+        if is_paused_manual: 
             play_sound('resume')
         is_paused_manual = False
 
