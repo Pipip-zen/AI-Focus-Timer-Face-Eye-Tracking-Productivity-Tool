@@ -5,7 +5,6 @@
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-FaceMesh-orange?style=flat)
 ![Machine Learning](https://img.shields.io/badge/ML-Computer%20Vision-purple?style=flat)
 ![Status](https://img.shields.io/badge/Status-Active-success?style=flat)
-![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat)
 
 An intelligent focus timer that uses **computer vision and artificial intelligence** to monitor your focus level in real time.
 
