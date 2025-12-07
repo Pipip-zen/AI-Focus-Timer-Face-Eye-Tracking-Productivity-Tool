@@ -29,7 +29,7 @@ normal_yaw = 0
 is_calibrated = False
 
 # --- CONFIG SENSITIVITAS GERAKAN KEPALA ---
-THRESHOLD_PITCH_DOWN = 8   # Saya naikkan dikit ke 8 biar ga terlalu sensitif saat nunduk dikit
+THRESHOLD_PITCH_DOWN = 1.5   # Saya naikkan dikit ke 8 biar ga terlalu sensitif saat nunduk dikit
 THRESHOLD_PITCH_UP = 20    
 THRESHOLD_YAW = 15         
 
