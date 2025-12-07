@@ -11,7 +11,7 @@ from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 # --- CONFIG HALAMAN ---
 st.set_page_config(page_title="AI Focus Mobile", layout="centered")
 
-st.title("📱 AI Focus Timer (Mobile Ver.)")
+st.title("📱 AI Focus Timer")
 st.write("Arahkan kamera HP ke wajah Anda. Tekan 'Start' untuk memulai.")
 
 # --- SIDEBAR CONFIG ---

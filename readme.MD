@@ -4,6 +4,9 @@
 ![OpenCV](https://img.shields.io/badge/OpenCV-Realtime-green?style=flat)
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-FaceMesh-orange?style=flat)
 ![Machine Learning](https://img.shields.io/badge/ML-Computer%20Vision-purple?style=flat)
+![Streamlit](https://img.shields.io/badge/Streamlit-Web%20Version-red?style=flat)
+![WebRTC](https://img.shields.io/badge/WebRTC-Enabled-blueviolet?style=flat)
+![Mobile Ready](https://img.shields.io/badge/Mobile-Ready📱-brightgreen?style=for-the-badge)
 ![Status](https://img.shields.io/badge/Status-Active-success?style=flat)
 
 An intelligent focus timer that uses **computer vision and artificial intelligence** to monitor your focus level in real time.
@@ -28,6 +31,18 @@ The timer only runs when you are truly focused, helping you build better concent
 ✅ Manual pause/resume control  
 ✅ Automatic calibration  
 ✅ Minimalist UI overlay
+
+---
+
+## 📷 Preview
+
+### 🖥️ Desktop Version
+
+![App Preview](assets/desktop-preview.png)
+
+### 📱 Mobile Web Version
+
+![App Preview](assets/mobile-preview.jpeg)
 
 ---
 
@@ -63,7 +78,7 @@ Make sure you have:
 Install dependencies:
 
 ```bash
-pip install opencv-python mediapipe numpy
+pip install opencv-python mediapipe numpy streamlit streamlit-webrtc av
 ```
 
 ---
@@ -77,6 +92,20 @@ python face_assistant.py
 ```
 
 You will be asked to input your focus session duration in minutes.
+
+---
+
+## 📱 Mobile / Web Version (Streamlit)
+
+This project also includes a **mobile-friendly web version** built with **Streamlit** and **WebRTC**.
+
+You can run it directly in your browser and access it from your phone.
+
+### How to Run the Web Version
+
+```bash
+streamlit run face_assistant.py
+```
 
 ---
 
@@ -112,16 +141,13 @@ Runs asynchronously to avoid video lag.
 ## 🛠️ Technologies Used
 
 Python
-
 OpenCV
-
 MediaPipe
-
 NumPy
-
 Windows _winsound_
-
 Threading
+Streamlit  
+WebRTC
 
 ---
 
@@ -139,10 +165,12 @@ Productivity enthusiasts
 
 📝 License
 
-This project is free to use.
+This project is free to use for learning and educational purposes.
 
 ---
 
 👨‍💻 Author
 
 Created by Rafif Nuha
+
+---
