@@ -6,7 +6,7 @@
 ![Machine Learning](https://img.shields.io/badge/ML-Computer%20Vision-purple?style=flat)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Web%20Version-red?style=flat)
 ![WebRTC](https://img.shields.io/badge/WebRTC-Enabled-blueviolet?style=flat)
-![Mobile Ready](https://img.shields.io/badge/Mobile-Ready📱-brightgreen?style=for-the-badge)
+![Mobile Ready](https://img.shields.io/badge/Mobile-Ready📱-brightgreen)
 ![Status](https://img.shields.io/badge/Status-Active-success?style=flat)
 
 An intelligent focus timer that uses **computer vision and artificial intelligence** to monitor your focus level in real time.
@@ -42,7 +42,7 @@ The timer only runs when you are truly focused, helping you build better concent
 
 ### 📱 Mobile Web Version
 
-![App Preview](assets/mobile-preview.jpeg)
+![App Preview](assets/mobile-preview.jpeg){ width=300 }
 
 ---
 
