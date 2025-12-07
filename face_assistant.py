@@ -3,7 +3,9 @@ import mediapipe as mp
 import numpy as np
 import time
 from math import hypot
-from collections import deque 
+from collections import deque
+import winsound  # Library suara untuk Windows
+import threading # Agar suara tidak bikin video lag
 
 # --- 1. SETUP & INPUT DURASI ---
 print("=== SETUP FOKUS TIMER ===")
@@ -25,12 +27,42 @@ cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
+# --- FUNGSI AUDIO ASYNC (Agar video tidak patah-patah) ---
+def play_sound(sound_type):
+    """
+    Menjalankan suara di thread terpisah.
+    Tipe: 'start', 'pause', 'resume', 'alarm', 'warning'
+    """
+    def run_sound():
+        try:
+            if sound_type == 'start':
+                # Nada naik (Tanda mulai)
+                winsound.Beep(500, 150)
+                winsound.Beep(1000, 300)
+            elif sound_type == 'pause':
+                # Nada turun (Tanda istirahat)
+                winsound.Beep(700, 200)
+                winsound.Beep(400, 200)
+            elif sound_type == 'resume':
+                # Nada naik pendek
+                winsound.Beep(500, 150)
+                winsound.Beep(800, 150)
+            elif sound_type == 'alarm':
+                # Alarm Nyaring (Tidur)
+                winsound.Beep(2000, 300) 
+            elif sound_type == 'warning':
+                # Peringatan Rendah (Menunduk)
+                winsound.Beep(600, 150)
+        except Exception as e:
+            pass # Abaikan error jika sistem sound bermasalah
+
+    # Jalankan di thread baru
+    threading.Thread(target=run_sound, daemon=True).start()
+
 # --- CONFIG TIMER ---
 time_left = POMODORO_MINUTES * 60
 last_frame_time = time.time()
 timer_running = False
-
-# UPDATE: Default False agar timer LANGSUNG JALAN
 is_paused_manual = False  
 
 # --- VARIABEL KALIBRASI ---
@@ -46,6 +78,11 @@ THRESHOLD_YAW = 15
 # --- CONFIG MENGANTUK (EAR) ---
 EAR_THRESHOLD = 0.15       
 ear_history = deque(maxlen=10) 
+
+# --- CONFIG INTERVAL SUARA ---
+# Agar alarm tidak bunyi berisik setiap mili-detik (spam)
+last_alarm_time = 0
+ALARM_COOLDOWN = 1.5 # Alarm hanya bunyi max setiap 1.5 detik
 
 # Font & Warna
 FONT = cv2.FONT_HERSHEY_SIMPLEX
@@ -73,7 +110,8 @@ def calculate_ear(landmarks, indices, img_w, img_h):
     return ear
 
 print(f"Sesi DIMULAI untuk {POMODORO_MINUTES} menit.")
-print("Tekan 'p' untuk PAUSE manual jika ingin meninggalkan kursi.")
+print("Sound System Aktif.")
+play_sound('start') # Bunyi awal
 
 while cap.isOpened():
     current_time = time.time()
@@ -129,7 +167,6 @@ while cap.isOpened():
             raw_pitch = angles[0] * 360
             raw_yaw = angles[1] * 360
 
-            # KALIBRASI OTOMATIS (Frame wajah pertama dianggap posisi normal)
             if not is_calibrated:
                 normal_pitch = raw_pitch
                 normal_yaw = raw_yaw
@@ -150,10 +187,13 @@ while cap.isOpened():
             ear_history.append(current_ear)
             smooth_ear = sum(ear_history) / len(ear_history)
 
-            # 3. PENENTUAN STATUS
+            # 3. PENENTUAN STATUS & LOGIKA SUARA
             is_sleeping = smooth_ear < EAR_THRESHOLD
             
-            # Prioritas Status
+            # Cek apakah sudah waktunya membunyikan alarm (Cooldown system)
+            time_since_alarm = current_time - last_alarm_time
+            should_play_alarm = time_since_alarm > ALARM_COOLDOWN
+
             if is_paused_manual:
                 status_text = "PAUSED (MANUAL)"
                 status_color = COLOR_ORANGE
@@ -162,6 +202,9 @@ while cap.isOpened():
                 status_text = "ALARM: TIDUR!"
                 status_color = COLOR_PURPLE
                 is_focused_now = False
+                if should_play_alarm:
+                    play_sound('alarm') # Bunyi Keras
+                    last_alarm_time = current_time
             elif rel_yaw < -THRESHOLD_YAW:
                 status_text = "MENOLEH KIRI"
                 status_color = COLOR_RED
@@ -174,6 +217,9 @@ while cap.isOpened():
                 status_text = "MENUNDUK"
                 status_color = COLOR_RED
                 is_focused_now = False
+                if should_play_alarm:
+                    play_sound('warning') # Bunyi Peringatan
+                    last_alarm_time = current_time
             elif rel_pitch > THRESHOLD_PITCH_UP:
                 status_text = "MENDONGAK"
                 status_color = COLOR_RED
@@ -200,6 +246,9 @@ while cap.isOpened():
         time_left = 0
         status_text = "SELESAI!"
         status_color = COLOR_YELLOW
+        # Bunyi 'Pause' jika timer selesai agar user sadar
+        if not is_paused_manual:
+            play_sound('pause')
         is_paused_manual = True 
 
     # --- UI RENDER ---
@@ -228,7 +277,7 @@ while cap.isOpened():
     control_text = "'p': PAUSE | 's': RESUME | 'c': RE-CALIBRATE | 'q': QUIT"
     cv2.putText(image, control_text, (30, 130), FONT, 0.6, COLOR_WHITE, 1)
 
-    cv2.imshow('AI Focus Timer V2.1 (Auto Start)', image)
+    cv2.imshow('AI Focus Timer V3.0 (Sound FX)', image)
     
     key = cv2.waitKey(5) & 0xFF
     if key == ord('q'): 
@@ -236,8 +285,12 @@ while cap.isOpened():
     elif key == ord('c'):
         is_calibrated = False
     elif key == ord('p'):
+        if not is_paused_manual: # Hanya bunyi jika belum pause
+            play_sound('pause')
         is_paused_manual = True
     elif key == ord('s'):
+        if is_paused_manual: # Hanya bunyi jika sedang pause
+            play_sound('resume')
         is_paused_manual = False
 
 cap.release()
